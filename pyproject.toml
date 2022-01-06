@@ -1,0 +1,53 @@
+[project]
+name = "wumpy-testing"
+version = "0.0.0"
+description = "Utilities for testing Wumpy projects."
+readme = {file = "README.md", content-type="text/markdown"}
+
+# Pytest has 3.7 as its current minimum requirement
+requires-python = ">=3.7"
+
+license = {file = "LICENSE"}
+authors = [{name = "Bluenix", email = "bluenixdev@gmail.com"}]
+
+keywords = [
+    "wumpy", "wumpus", "wrapper",
+    "discord", "discord-api", "discord-bot", "discord-api-wrapper",
+    "python-3"
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Internet",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+dependencies = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/wumpyproject"
+Repository = "https://github.com/wumpyproject/wumpy-testing"
+Documentation = "https://wumpy.rtfd.io"
+
+[build-system]
+requires = ["flit_core >=3.5, <4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+# This is a subpackage under the wumpy namespace package,
+# we need to tell flit this otherwise it tries to make the
+# import wumpy-gateway rather than wumpy.gateway
+name = "wumpy.testing"
