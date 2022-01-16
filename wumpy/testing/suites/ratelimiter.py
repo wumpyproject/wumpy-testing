@@ -133,7 +133,7 @@ class RatelimiterSuite:
         first: Route,
         second: Route,
     ) -> None:
-        result = self.measure_ratelimiting(first, second)
+        result = await self.measure_ratelimiting(first, second)
 
         expected = (
             first.endpoint == second.endpoint and
