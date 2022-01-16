@@ -141,6 +141,20 @@ class RatelimiterSuite:
         )
         assert result is expected
 
+    @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        ['first', 'second', 'third'],
+        [
+            # Same bucket - Same endpoint - Same major parameter
+            # Same bucket - Same endpoint - Different major parameter
+            # Same bucket - Different endpoint - Same major parameter
+            # Same bucket - Different endpoint - Different major parameter
+            # Different bucket - Same endpoint - Same major parameter
+            # Different bucket - Same endpoint - Different major parameter
+            # Different bucket - Different endpoint - Same major parameter
+            # Different bucket - Different endpoint - Different major parameter
+        ]
+    )
     async def test_ratelimiter_bucket(
         self,
         first: Tuple[Route, dict],
