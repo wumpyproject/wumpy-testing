@@ -55,29 +55,33 @@ class RatelimiterSuite:
         async with impl as limiter:
 
             proxy = limiter(first)
-            start = perf_counter()
 
             # This is the reference request, which we base the timing for.
-            update = await proxy.__aenter__()
-            started = perf_counter() - start
+            start = perf_counter()
+            async with proxy as update:
+                started = perf_counter() - start
 
-            delta = timedelta(seconds=self.DELTA_DURATION)
-            now = datetime.now(tz=timezone.utc)
+                delta = timedelta(seconds=self.DELTA_DURATION)
+                now = datetime.now(tz=timezone.utc)
 
-            await update({
-                'X-RateLimit-Limit': '1',
-                'X-RateLimit-Remaining': '0',
-                'X-RateLimit-Reset': str((now + delta).timestamp()),
-                'X-RateLimit-Reset-After': str(delta.total_seconds()),
-            })
-
-            await proxy.__aexit__(*sys.exc_info())
+                await update({
+                    'X-RateLimit-Limit': '1',
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': str((now + delta).timestamp()),
+                    'X-RateLimit-Reset-After': str(delta.total_seconds()),
+                })
 
             # With half the time it took an unratelimited access as a margin,
             # finally make the underlying test:
             proxy = limiter(second)
             with anyio.move_on_after(started * 1.5) as scope:
                 update = await proxy.__aenter__()
+
+            if scope.cancel_called:
+                # If __aenter__() was cancelled, and an error was raised in it
+                # then it failed and if this was used as 'async with' then the
+                # body, or __aexit__() would not run. We need to exit early.
+                return True
 
             await update({
                 'X-RateLimit-Limit': '1',
@@ -157,9 +161,9 @@ class RatelimiterSuite:
     )
     async def test_ratelimiter_bucket(
         self,
-        first: Tuple[Route, dict],
-        second: Tuple[Route, dict],
-        third: Tuple[Route, dict],
+        first: Tuple[Route, str],
+        second: Tuple[Route, str],
+        third: Tuple[Route, str],
         result: bool
     ) -> None:
         """Make three ratelimited requests as a test for X-RateLimit-Bucket.
@@ -181,9 +185,13 @@ class RatelimiterSuite:
 
         async with impl as limiter:
 
+            proxy = limiter(first[0])
+
             # This is the reference request, which we base the timing for.
             start = perf_counter()
-            async with limiter(first[0]) as update:
+            async with proxy as update:
+                started = perf_counter() - start
+
                 delta = timedelta(seconds=self.DELTA_DURATION)
                 now = datetime.now(tz=timezone.utc)
 
@@ -192,32 +200,44 @@ class RatelimiterSuite:
                     'X-RateLimit-Remaining': '1',
                     'X-RateLimit-Reset': str((now + delta).timestamp()),
                     'X-RateLimit-Reset-After': str(delta.total_seconds()),
-                    **first[1]
+                    'X-RateLimit-Bucket': first[1]
                 })
-            duration = perf_counter() - start
+
+            # If we're able to get more accurate timings then we might as well.
+            start = perf_counter()
+            async with limiter(second[0]) as update:
+                started = (started + perf_counter() - start) / 2
+
+                await update({
+                    'X-RateLimit-Limit': '2',
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': str((now + delta).timestamp()),
+                    'X-RateLimit-Reset-After': str(delta.total_seconds()),
+                    'X-RateLimit-Bucket': second[1]
+                })
 
             # With half the time it took an unratelimited access as a margin,
-            # make the underlying test. Because we don't know when the
-            # ratelimiter decides to block and wait we need to make one request
-            # that exhausts the ratelimit and one that will exceed it.
-            with anyio.move_on_after(duration * 2.5) as scope:
-                async with limiter(second[0]) as update:
-                    await update({
-                        'X-RateLimit-Limit': '2',
-                        'X-RateLimit-Remaining': '0',
-                        'X-RateLimit-Reset': str((now + delta).timestamp()),
-                        'X-RateLimit-Reset-After': str(delta.total_seconds()),
-                        **second[1]
-                    })
+            # finally make the underlying test:
+            proxy = limiter(third[0])
+            with anyio.move_on_after(started * 1.5) as scope:
+                update = await proxy.__aenter__()
 
-                async with limiter(third[0]) as update:
-                    await update({
-                        'X-RateLimit-Limit': '1',
-                        'X-RateLimit-Remaining': '0',
-                        'X-RateLimit-Reset': str((now + delta).timestamp()),
-                        'X-RateLimit-Reset-After': str(delta.total_seconds()),
-                        'X-RateLimit-Scope': 'user',
-                        **third[1]
-                    })
+            if scope.cancel_called:
+                # Similar to the non-bucket tests, we need to follow the
+                # expected behavior of asynchronous context managers and exit
+                # early if __aenter__() was cancelled.
+                assert scope.cancel_called is result
+                return
+
+            await update({
+                'X-RateLimit-Limit': '1',
+                'X-RateLimit-Remaining': '0',
+                'X-RateLimit-Reset': str((now + delta).timestamp()),
+                'X-RateLimit-Reset-After': str(delta.total_seconds()),
+                'X-RateLimit-Scope': 'user',
+                'X-RateLimit-Bucket': third[1]
+            })
+
+            await proxy.__aexit__(*sys.exc_info())
 
             assert scope.cancel_called is result
