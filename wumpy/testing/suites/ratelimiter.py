@@ -105,30 +105,48 @@ class RatelimiterSuite:
 
     @pytest.mark.anyio
     @pytest.mark.parametrize(
-        ['first', 'second'],
+        ['first', 'second', 'result'],
         [
+            # Same endpoint - No major parameter
+            (
+                Route('GET', '/gateway'),
+                Route('GET', '/gateway'),
+                True
+            ),
+
             # Same endpoint - Same major parameter
             (
                 Route('GET', '/channels/{channel_id}', channel_id=41771983423143937),
                 Route('GET', '/channels/{channel_id}', channel_id=41771983423143937),
+                True
             ),
 
             # Same endpoint - Different major parameter
             (
                 Route('POST', '/channels/{channel_id}', channel_id=41771983423143937),
                 Route('POST', '/channels/{channel_id}', channel_id=155101607195836416),
+                False
+            ),
+
+            # Different endpoint - No major parameter
+            (
+                Route('GET', '/gateway'),
+                Route('GET', '/gateway/bot'),
+                False
             ),
 
             # Different endpoint - Same major parameter
             (
                 Route('GET', '/guilds/{guild_id}/bans', guild_id=197038439483310086),
                 Route('GET', '/guilds/{guild_id}/roles', guild_id=197038439483310086),
+                False
             ),
 
             # Different endpoint - Different major parameter
             (
                 Route('GET', '/webhooks/{webhook_id}', webhook_id=752831914402115456),
                 Route('DELETE', '/webhooks/{webhook_id}', webhook_id=752831914402115456),
+                False
             ),
         ]
     )
@@ -136,14 +154,11 @@ class RatelimiterSuite:
         self,
         first: Route,
         second: Route,
+        result: bool,
     ) -> None:
         result = await self.measure_ratelimiting(first, second)
 
-        expected = (
-            first.endpoint == second.endpoint and
-            first.major_params == second.major_params
-        )
-        assert result is expected
+        assert result is result
 
     @pytest.mark.anyio
     @pytest.mark.parametrize(
