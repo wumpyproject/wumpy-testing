@@ -71,10 +71,10 @@ class RatelimiterSuite:
                     'X-RateLimit-Reset-After': str(delta.total_seconds()),
                 })
 
-            # With half the time it took an unratelimited access as a margin,
+            # With three times the time of an unratelimited access as a margin,
             # finally make the underlying test:
             proxy = limiter(second)
-            with anyio.move_on_after(started * 1.5) as scope:
+            with anyio.move_on_after(started * 3) as scope:
                 update = await proxy.__aenter__()
 
             if scope.cancel_called:
@@ -231,10 +231,10 @@ class RatelimiterSuite:
                     'X-RateLimit-Bucket': second[1]
                 })
 
-            # With half the time it took an unratelimited access as a margin,
+            # With three times the time of an unratelimited access as a margin,
             # finally make the underlying test:
             proxy = limiter(third[0])
-            with anyio.move_on_after(started * 1.5) as scope:
+            with anyio.move_on_after(started * 3) as scope:
                 update = await proxy.__aenter__()
 
             if scope.cancel_called:
