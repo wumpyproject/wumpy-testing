@@ -162,23 +162,99 @@ class RatelimiterSuite:
 
     @pytest.mark.anyio
     @pytest.mark.parametrize(
-        ['first', 'second', 'third'],
+        ['first', 'second', 'result'],
         [
             # Same bucket - Same endpoint - Same major parameter
+            (
+                (
+                    Route('GET', '/webhooks/{webhook_id}', webhook_id=752831914402115456),
+                    '3cd1f278bd0ecaf11e0d2391374c011d'
+                ),
+                (
+                    Route('DELETE', '/webhooks/{webhook_id}', webhook_id=752831914402115456),
+                    '3cd1f278bd0ecaf11e0d2391374c011d'
+                ),
+                True
+            ),
+
             # Same bucket - Same endpoint - Different major parameter
+            (
+                (
+                    Route('POST', '/channels/{channel_id}/messages',
+                          channel_id=41771983423143937),
+                    'a443a5c697baf9f2c9b168da3d8a6403'
+                ),
+                (
+                    Route('POST', '/channels/{channel_id}/messages',
+                          channel_id=319674150115610528),
+                    'a443a5c697baf9f2c9b168da3d8a6403'
+                ),
+                False
+            ),
+
             # Same bucket - Different endpoint - Same major parameter
+            (
+                (
+                    Route('POST', '/channels/{channel_id}/messages/bulk-delete',
+                          channel_id=399942396007890945),
+                    '80c17d2f203122d936070c88c8d10f33'
+                ),
+                (
+                    Route('DELETE', '/channels/{channel_id}', channel_id=399942396007890945),
+                    '80c17d2f203122d936070c88c8d10f33'
+                ),
+                True
+            ),
+
             # Same bucket - Different endpoint - Different major parameter
-            # Different bucket - Same endpoint - Same major parameter
-            # Different bucket - Same endpoint - Different major parameter
+            (
+                (
+                    Route('GET', '/guilds/{guild_id}/members', guild_id=2909267986263572999),
+                    '9852e1a53c06ffc5a89d65fef85ca4ce'
+                ),
+                (
+                    Route('GET', '/guilds/{guild_id}/channels', guild_id=41771983423143937),
+                    '9852e1a53c06ffc5a89d65fef85ca4ce'
+                ),
+                False
+            ),
+
+            # We'll have to skip these, as they aren't possible to receive from
+            # the Discord API in any case:
+            #     Different bucket - Same endpoint - Same major parameter
+            #     Different bucket - Same endpoint - Different major parameter
+
             # Different bucket - Different endpoint - Same major parameter
+            (
+                (
+                    Route('POST', '/guilds/{guild_id}/roles', guild_id=197038439483310086),
+                    '37aebbab7b7a2d8f20acdca33f7a7934'
+                ),
+                (
+                    Route('POST', '/guilds/{guild_id}/prune', guild_id=197038439483310086),
+                    '087226e88721bc988cf853c666255256'
+                ),
+                False
+            ),
+
             # Different bucket - Different endpoint - Different major parameter
+            (
+                (
+                    Route('GET', '/guilds/{guild_id}/regions', guild_id=197038439483310086),
+                    '37aebbab7b7a2d8f20acdca33f7a7934'
+                ),
+                (
+                    Route('GET', '/guilds/{guild_id}/invites', guild_id=2909267986263572999),
+                    '3cd1f278bd0ecaf11e0d2391374c011d'
+                ),
+                False
+            ),
         ]
     )
     async def test_ratelimiter_bucket(
         self,
         first: Tuple[Route, str],
         second: Tuple[Route, str],
-        third: Tuple[Route, str],
         result: bool
     ) -> None:
         """Make three ratelimited requests as a test for X-RateLimit-Bucket.
@@ -186,10 +262,14 @@ class RatelimiterSuite:
         Although similar, this is purposefully separated from the other
         ratelimiter test.
 
+        The first request is made twice - an additional time after the second
+        request. This is the request that is tested whether it is being
+        ratelimited; doing it this way reduces the effort in crafting test
+        parametrizations for the test case.
+
         Parameters:
             first: The first request to make.
             second: The second request to make.
-            third: The third request to make.
             result: Whether the third request should have been ratelimited.
 
         Returns:
@@ -233,7 +313,7 @@ class RatelimiterSuite:
 
             # With three times the time of an unratelimited access as a margin,
             # finally make the underlying test:
-            proxy = limiter(third[0])
+            proxy = limiter(first[0])
             with anyio.move_on_after(started * 3) as scope:
                 update = await proxy.__aenter__()
 
@@ -250,7 +330,7 @@ class RatelimiterSuite:
                 'X-RateLimit-Reset': str((now + delta).timestamp()),
                 'X-RateLimit-Reset-After': str(delta.total_seconds()),
                 'X-RateLimit-Scope': 'user',
-                'X-RateLimit-Bucket': third[1]
+                'X-RateLimit-Bucket': first[1]
             })
 
             await proxy.__aexit__(*sys.exc_info())
