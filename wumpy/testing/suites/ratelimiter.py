@@ -1,11 +1,20 @@
 import sys
 from datetime import datetime, timedelta, timezone
 from time import perf_counter
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
 import anyio
 import pytest
-from wumpy.rest import Ratelimiter, Route
+
+if TYPE_CHECKING:
+    from wumpy.rest import Ratelimiter, Route
+else:
+    __mod = pytest.importorskip(
+        'wumpy.rest', reason='Wumpy-rest is required for the ratelimiter test suite'
+    )
+    Ratelimiter = __mod.Ratelimiter
+    Route = __mod.Route
+
 
 __all__ = ('RatelimiterSuite',)
 
