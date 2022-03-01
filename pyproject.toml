@@ -35,7 +35,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-dependencies = ["pytest"]
+# The @pytest.mark.anyio decorator runs tests with both asyncio and trio even
+# when it isn't installed so we need to make sure that trio is installed.
+dependencies = ["pytest > 7, < 8", "anyio[trio] >= 3.3.4, <4"]
 
 [project.urls]
 Homepage = "https://github.com/wumpyproject"
