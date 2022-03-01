@@ -14,6 +14,7 @@ else:
     )
     Ratelimiter = __mod.Ratelimiter
     Route = __mod.Route
+    del __mod
 
 
 __all__ = ('RatelimiterSuite',)
