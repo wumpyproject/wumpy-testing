@@ -111,7 +111,7 @@ class RatelimiterSuite:
             Route('GET', '/users/@me'),
             Route('PATCH', '/users/@me')
         )
-        assert result is False
+        assert result == False
 
     @pytest.mark.anyio
     @pytest.mark.parametrize(
@@ -168,7 +168,7 @@ class RatelimiterSuite:
     ) -> None:
         result = await self.measure_ratelimiting(first, second)
 
-        assert result is result
+        assert result == result
 
     @pytest.mark.anyio
     @pytest.mark.parametrize(
@@ -331,7 +331,7 @@ class RatelimiterSuite:
                 # Similar to the non-bucket tests, we need to follow the
                 # expected behavior of asynchronous context managers and exit
                 # early if __aenter__() was cancelled.
-                assert scope.cancel_called is result
+                assert scope.cancel_called == result
                 return
 
             await update({
@@ -345,4 +345,4 @@ class RatelimiterSuite:
 
             await proxy.__aexit__(*sys.exc_info())
 
-            assert scope.cancel_called is result
+            assert scope.cancel_called == result
