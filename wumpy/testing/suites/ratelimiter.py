@@ -7,13 +7,14 @@ import anyio
 import pytest
 
 if TYPE_CHECKING:
-    from wumpy.rest import Ratelimiter, Route
+    from wumpy.rest import Ratelimiter, Route, RatelimiterContext
 else:
     __mod = pytest.importorskip(
         'wumpy.rest', reason='Wumpy-rest is required for the ratelimiter test suite'
     )
     Ratelimiter = __mod.Ratelimiter
     Route = __mod.Route
+    RatelimiterContext = __mod.RatelimiterContext
     del __mod
 
 
@@ -42,12 +43,12 @@ class RatelimiterSuite:
 
     @pytest.mark.anyio
     async def test_no_headers(self):
-        impl = self.get_impl()
+        limiter = self.get_impl()
 
         # While it doesn't look like it tests much, it's a distinct test for
         # TypeErrors if the ratelimiter doesn't follow the typing correctly.
-        async with impl as limiter:
-            async with limiter(Route('GET', '/gateway')) as update:
+        async with limiter:
+            async with limiter(Route('GET', '/gateway'), RatelimiterContext()) as update:
                 await update({})
 
     async def measure_ratelimiting(self, first: Route, second: Route) -> bool:
@@ -60,11 +61,11 @@ class RatelimiterSuite:
         Returns:
             Whether the second request was ratelimited.
         """
-        impl = self.get_impl()
+        limiter = self.get_impl()
 
-        async with impl as limiter:
+        async with limiter:
 
-            proxy = limiter(first)
+            proxy = limiter(first, RatelimiterContext())
 
             # This is the reference request, which we base the timing for.
             start = perf_counter()
@@ -83,7 +84,7 @@ class RatelimiterSuite:
 
             # With three times the time of an unratelimited access as a margin,
             # finally make the underlying test:
-            proxy = limiter(second)
+            proxy = limiter(second, RatelimiterContext())
             with anyio.move_on_after(started * 3) as scope:
                 update = await proxy.__aenter__()
 
@@ -286,15 +287,13 @@ class RatelimiterSuite:
             Whether the third request took longer than it should have -
             indicating that it was ratelimited.
         """
-        impl = self.get_impl()
+        limiter = self.get_impl()
 
-        async with impl as limiter:
-
-            proxy = limiter(first[0])
+        async with limiter:
 
             # This is the reference request, which we base the timing for.
             start = perf_counter()
-            async with proxy as update:
+            async with limiter(first[0], RatelimiterContext()) as update:
                 started = perf_counter() - start
 
                 delta = timedelta(seconds=self.DELTA_DURATION)
@@ -310,7 +309,7 @@ class RatelimiterSuite:
 
             # If we're able to get more accurate timings then we might as well.
             start = perf_counter()
-            async with limiter(second[0]) as update:
+            async with limiter(second[0], RatelimiterContext()) as update:
                 started = (started + perf_counter() - start) / 2
 
                 await update({
@@ -323,7 +322,7 @@ class RatelimiterSuite:
 
             # With three times the time of an unratelimited access as a margin,
             # finally make the underlying test:
-            proxy = limiter(first[0])
+            proxy = limiter(first[0], RatelimiterContext())
             with anyio.move_on_after(started * 3) as scope:
                 update = await proxy.__aenter__()
 
